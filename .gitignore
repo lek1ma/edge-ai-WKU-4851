@@ -1,0 +1,30 @@
+# Build outputs
+/android_app/
+**/build/
+**/.gradle/
+**/out/
+**/*.apk
+**/*.idsig
+**/*.dex
+
+# Local SDKs and downloaded tool archives
+Project/tools/
+Project/open_model_zoo-master/
+*.zip
+
+# Python caches and local environments
+**/__pycache__/
+**/*.py[cod]
+.venv/
+venv/
+
+# Local logs and temporary ADB output
+adb_devices*.txt
+*.log
+
+# IDE and OS files
+.idea/
+.vscode/
+**/local.properties
+.DS_Store
+Thumbs.db
