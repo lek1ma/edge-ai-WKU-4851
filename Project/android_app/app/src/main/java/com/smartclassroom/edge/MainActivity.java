@@ -709,13 +709,15 @@ public class MainActivity extends Activity {
                 viewWidth / (float) cameraPreviewSize.getWidth());
         matrix.postScale(scale, scale, centerX, centerY);
         matrix.postRotate(relativeRotation, centerX, centerY);
-        if (cameraLensFacing == CameraCharacteristics.LENS_FACING_FRONT) {
-            matrix.postScale(-1f, 1f, centerX, centerY);
-        }
         synchronized (cameraPreviewTransform) {
             cameraPreviewTransform.set(matrix);
         }
-        runOnUiThread(() -> preview.setTransform(matrix));
+        boolean mirrorPreview = cameraLensFacing == CameraCharacteristics.LENS_FACING_FRONT;
+        runOnUiThread(() -> {
+            preview.setTransform(matrix);
+            preview.setPivotX(viewWidth * 0.5f);
+            preview.setScaleX(mirrorPreview ? -1f : 1f);
+        });
     }
 
     private int relativeCameraRotation() {
@@ -1200,6 +1202,12 @@ public class MainActivity extends Activity {
         for (RecognizedFace face : faces) {
             RectF box = new RectF(face.box);
             matrix.mapRect(box);
+            if (cameraLensFacing == CameraCharacteristics.LENS_FACING_FRONT) {
+                float mirroredLeft = preview.getWidth() - box.right;
+                float mirroredRight = preview.getWidth() - box.left;
+                box.left = mirroredLeft;
+                box.right = mirroredRight;
+            }
             transformed.add(new RecognizedFace(box, face.label, face.score));
         }
         return transformed;
