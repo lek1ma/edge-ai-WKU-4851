@@ -719,6 +719,9 @@ public class MainActivity extends Activity {
     }
 
     private int relativeCameraRotation() {
+        if (cameraLensFacing == CameraCharacteristics.LENS_FACING_BACK) {
+            return (360 - cameraSensorOrientation) % 360;
+        }
         return cameraSensorOrientation;
     }
 
