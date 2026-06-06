@@ -67,18 +67,24 @@ The rolling averages appear in the app status area. Detailed samples are also wr
 to Logcat with the tag `FacePerformance` and to the app-private file
 `files/performance/performance_log.csv`.
 
-## Optional Model Compression Experiment
+## Optional FP16 Model Quantization Experiment
 
-`tools/compress_tflite.py` creates a separate lossless Gzip artifact for storage or
-distribution experiments. It never modifies the source model, and the Android app
-continues to load the original `facenet.tflite`.
+`tools/quantize_fp16.py` demonstrates TensorFlow Lite post-training FP16
+quantization. It converts model weights from FP32 to FP16, reducing model size and
+potentially lowering memory use on supported edge devices.
+
+Quantization must start from the original TensorFlow SavedModel or Keras model. An
+already converted `.tflite` file is not a valid conversion source.
 
 ```bash
-python3 tools/compress_tflite.py \
-  Project/android_app/app/src/main/assets/model/facenet.tflite
+python3 -m pip install -r tools/requirements-model-compression.txt
+python3 tools/quantize_fp16.py /path/to/facenet_saved_model \
+  --output facenet_fp16.tflite
 ```
 
-The generated `.tflite.gz` file is ignored by Git and is not enabled at runtime.
+The generated `facenet_fp16.tflite` is ignored by Git and is not enabled at
+runtime. The Android app continues to load the original `facenet.tflite`, so this
+experiment does not affect the current recognition accuracy or tablet installation.
 
 Bundled roster photos under `assets/roster/` are converted into local embeddings on first launch, then live camera faces are compared against that on-device gallery.
 

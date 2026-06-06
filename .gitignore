@@ -11,7 +11,7 @@
 Project/tools/
 Project/open_model_zoo-master/
 *.zip
-*.tflite.gz
+*_fp16.tflite
 
 # Python caches and local environments
 **/__pycache__/
