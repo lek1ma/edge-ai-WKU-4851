@@ -26,11 +26,13 @@ import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.Face;
+import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.FaceDetector;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.SystemClock;
+import android.util.Size;
 import android.view.Gravity;
 import android.view.Surface;
 import android.view.TextureView;
@@ -55,6 +57,7 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
@@ -92,6 +95,10 @@ public class MainActivity extends Activity {
     private Handler cameraHandler;
     private CameraDevice cameraDevice;
     private CameraCaptureSession captureSession;
+    private Size cameraPreviewSize;
+    private int cameraSensorOrientation;
+    private int cameraLensFacing = CameraCharacteristics.LENS_FACING_FRONT;
+    private final Matrix cameraPreviewTransform = new Matrix();
     private boolean faceScanRunning;
     private boolean useFrontCamera = true;
     private int hardwareFaceMode = CaptureRequest.STATISTICS_FACE_DETECT_MODE_OFF;
@@ -140,6 +147,7 @@ public class MainActivity extends Activity {
 
             @Override
             public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
+                configurePreviewTransform(width, height);
             }
 
             @Override
@@ -506,6 +514,14 @@ public class MainActivity extends Activity {
             }
             CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
             hardwareFaceMode = chooseFaceDetectMode(characteristics);
+            Integer sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
+            Integer lensFacing = characteristics.get(CameraCharacteristics.LENS_FACING);
+            cameraSensorOrientation = sensorOrientation == null ? 0 : sensorOrientation;
+            cameraLensFacing = lensFacing == null
+                    ? CameraCharacteristics.LENS_FACING_FRONT
+                    : lensFacing;
+            cameraPreviewSize = choosePreviewSize(characteristics, preview.getWidth(), preview.getHeight());
+            configurePreviewTransform(preview.getWidth(), preview.getHeight());
             manager.openCamera(cameraId, new CameraDevice.StateCallback() {
                 @Override
                 public void onOpened(CameraDevice camera) {
@@ -566,15 +582,67 @@ public class MainActivity extends Activity {
         return fallback;
     }
 
+    private Size choosePreviewSize(CameraCharacteristics characteristics, int viewWidth, int viewHeight) {
+        StreamConfigurationMap map =
+                characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+        Size[] choices = map == null ? null : map.getOutputSizes(SurfaceTexture.class);
+        if (choices == null || choices.length == 0) {
+            return new Size(Math.max(1, viewWidth), Math.max(1, viewHeight));
+        }
+
+        int relativeRotation = relativeCameraRotation();
+        int targetWidth = relativeRotation == 90 || relativeRotation == 270 ? viewHeight : viewWidth;
+        int targetHeight = relativeRotation == 90 || relativeRotation == 270 ? viewWidth : viewHeight;
+        float targetRatio = targetWidth / (float) Math.max(1, targetHeight);
+
+        List<Size> suitable = new ArrayList<>();
+        for (Size choice : choices) {
+            if (choice.getWidth() > 2560 || choice.getHeight() > 2560) {
+                continue;
+            }
+            float ratio = choice.getWidth() / (float) choice.getHeight();
+            if (Math.abs(ratio - targetRatio) < 0.08f
+                    && choice.getWidth() >= Math.min(targetWidth, 1280)
+                    && choice.getHeight() >= Math.min(targetHeight, 720)) {
+                suitable.add(choice);
+            }
+        }
+        if (!suitable.isEmpty()) {
+            return Collections.min(suitable, Comparator.comparingLong(
+                    size -> (long) size.getWidth() * size.getHeight()));
+        }
+
+        Size best = choices[0];
+        float bestDifference = Float.MAX_VALUE;
+        for (Size choice : choices) {
+            if (choice.getWidth() > 2560 || choice.getHeight() > 2560) {
+                continue;
+            }
+            float difference = Math.abs(
+                    choice.getWidth() / (float) choice.getHeight() - targetRatio);
+            if (difference < bestDifference) {
+                bestDifference = difference;
+                best = choice;
+            }
+        }
+        return best;
+    }
+
     private void startPreview() {
         try {
             SurfaceTexture texture = preview.getSurfaceTexture();
             if (texture == null || cameraDevice == null) {
                 return;
             }
-            int width = Math.max(preview.getWidth(), 1280);
-            int height = Math.max(preview.getHeight(), 720);
-            texture.setDefaultBufferSize(width, height);
+            if (cameraPreviewSize == null) {
+                cameraPreviewSize = new Size(
+                        Math.max(preview.getWidth(), 1280),
+                        Math.max(preview.getHeight(), 720));
+            }
+            texture.setDefaultBufferSize(
+                    cameraPreviewSize.getWidth(),
+                    cameraPreviewSize.getHeight());
+            configurePreviewTransform(preview.getWidth(), preview.getHeight());
             Surface surface = new Surface(texture);
             CaptureRequest.Builder builder =
                     cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
@@ -609,6 +677,49 @@ public class MainActivity extends Activity {
         } catch (CameraAccessException e) {
             setStatus(status.getText() + "\nCamera: " + e.getMessage());
         }
+    }
+
+    private void configurePreviewTransform(int viewWidth, int viewHeight) {
+        if (preview == null || cameraPreviewSize == null || viewWidth <= 0 || viewHeight <= 0) {
+            return;
+        }
+        int relativeRotation = relativeCameraRotation();
+        RectF viewRect = new RectF(0, 0, viewWidth, viewHeight);
+        RectF bufferRect;
+        if (relativeRotation == 90 || relativeRotation == 270) {
+            bufferRect = new RectF(
+                    0,
+                    0,
+                    cameraPreviewSize.getHeight(),
+                    cameraPreviewSize.getWidth());
+        } else {
+            bufferRect = new RectF(
+                    0,
+                    0,
+                    cameraPreviewSize.getWidth(),
+                    cameraPreviewSize.getHeight());
+        }
+        float centerX = viewRect.centerX();
+        float centerY = viewRect.centerY();
+        bufferRect.offset(centerX - bufferRect.centerX(), centerY - bufferRect.centerY());
+        Matrix matrix = new Matrix();
+        matrix.setRectToRect(viewRect, bufferRect, Matrix.ScaleToFit.FILL);
+        float scale = Math.max(
+                viewHeight / (float) cameraPreviewSize.getHeight(),
+                viewWidth / (float) cameraPreviewSize.getWidth());
+        matrix.postScale(scale, scale, centerX, centerY);
+        matrix.postRotate(relativeRotation, centerX, centerY);
+        if (cameraLensFacing == CameraCharacteristics.LENS_FACING_FRONT) {
+            matrix.postScale(-1f, 1f, centerX, centerY);
+        }
+        synchronized (cameraPreviewTransform) {
+            cameraPreviewTransform.set(matrix);
+        }
+        runOnUiThread(() -> preview.setTransform(matrix));
+    }
+
+    private int relativeCameraRotation() {
+        return cameraSensorOrientation;
     }
 
     private void closeCamera() {
@@ -1065,7 +1176,7 @@ public class MainActivity extends Activity {
                     refreshAttendanceList();
                 }
                 if (faceOverlay != null) {
-                    faceOverlay.setFaces(faces);
+                    faceOverlay.setFaces(transformFaceBoxes(faces));
                 }
                 if (status != null) {
                     status.setText(String.format(Locale.US,
@@ -1078,6 +1189,20 @@ public class MainActivity extends Activity {
                 }
             }
         });
+    }
+
+    private List<RecognizedFace> transformFaceBoxes(List<RecognizedFace> faces) {
+        List<RecognizedFace> transformed = new ArrayList<>(faces.size());
+        Matrix matrix = new Matrix();
+        synchronized (cameraPreviewTransform) {
+            matrix.set(cameraPreviewTransform);
+        }
+        for (RecognizedFace face : faces) {
+            RectF box = new RectF(face.box);
+            matrix.mapRect(box);
+            transformed.add(new RecognizedFace(box, face.label, face.score));
+        }
+        return transformed;
     }
 
     private void refreshAttendanceList() {
