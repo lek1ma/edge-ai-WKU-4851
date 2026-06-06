@@ -53,6 +53,33 @@ marked present and the first recognition time is recorded.
 - Newly enrolled students are added to the roster automatically.
 - The `Reset` button clears the current day's attendance for a new class or test.
 
+## Performance Logging
+
+The Android app records per-frame face pipeline timings without changing recognition
+thresholds or model inputs:
+
+- face detection latency
+- feature extraction and recognition latency
+- total processing latency
+- detected face count and a rolling 30-frame average
+
+The rolling averages appear in the app status area. Detailed samples are also written
+to Logcat with the tag `FacePerformance` and to the app-private file
+`files/performance/performance_log.csv`.
+
+## Optional Model Compression Experiment
+
+`tools/compress_tflite.py` creates a separate lossless Gzip artifact for storage or
+distribution experiments. It never modifies the source model, and the Android app
+continues to load the original `facenet.tflite`.
+
+```bash
+python3 tools/compress_tflite.py \
+  Project/android_app/app/src/main/assets/model/facenet.tflite
+```
+
+The generated `.tflite.gz` file is ignored by Git and is not enabled at runtime.
+
 Bundled roster photos under `assets/roster/` are converted into local embeddings on first launch, then live camera faces are compared against that on-device gallery.
 
 Recommended batch roster layout:

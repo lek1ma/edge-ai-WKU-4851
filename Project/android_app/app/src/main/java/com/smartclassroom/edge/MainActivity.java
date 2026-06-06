@@ -98,6 +98,7 @@ public class MainActivity extends Activity {
     private long lastFaceScanAt;
     private FaceDatabase faceDatabase;
     private AttendanceDatabase attendanceDatabase;
+    private PerformanceLogger performanceLogger;
     private float[] lastSingleFaceFeature;
     private long lastSingleFaceAt;
     private TfliteFaceDetector tfliteFaceDetector;
@@ -115,6 +116,7 @@ public class MainActivity extends Activity {
         try {
             faceDatabase = new FaceDatabase(this);
             attendanceDatabase = new AttendanceDatabase(this);
+            performanceLogger = new PerformanceLogger(this);
             buildUi();
             prepareModel();
             if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
@@ -662,14 +664,31 @@ public class MainActivity extends Activity {
     }
 
     private void detectFaces(Bitmap snapshot, int viewWidth, int viewHeight) {
+        long totalStart = SystemClock.elapsedRealtimeNanos();
         try {
-            updateFaceResults(recognizeFaces(snapshot, findFacesInAnyRotation(snapshot, viewWidth, viewHeight)));
+            long detectionStart = SystemClock.elapsedRealtimeNanos();
+            List<FaceCandidate> candidates = findFacesInAnyRotation(snapshot, viewWidth, viewHeight);
+            double detectionMs = elapsedMs(detectionStart);
+
+            long recognitionStart = SystemClock.elapsedRealtimeNanos();
+            List<RecognizedFace> faces = recognizeFaces(snapshot, candidates);
+            double recognitionMs = elapsedMs(recognitionStart);
+            PerformanceLogger.Snapshot metrics = performanceLogger.record(
+                    faces.size(),
+                    detectionMs,
+                    recognitionMs,
+                    elapsedMs(totalStart));
+            updateFaceResults(faces, metrics);
         } catch (Throwable t) {
             setStatus("Face detection failed: " + t.getClass().getSimpleName() + ": " + t.getMessage());
         } finally {
             snapshot.recycle();
             faceScanRunning = false;
         }
+    }
+
+    private double elapsedMs(long startNanos) {
+        return (SystemClock.elapsedRealtimeNanos() - startNanos) / 1_000_000.0;
     }
 
     private List<FaceCandidate> findFacesInAnyRotation(Bitmap snapshot, int viewWidth, int viewHeight) {
@@ -1032,7 +1051,7 @@ public class MainActivity extends Activity {
         return feature;
     }
 
-    private void updateFaceResults(List<RecognizedFace> faces) {
+    private void updateFaceResults(List<RecognizedFace> faces, PerformanceLogger.Snapshot metrics) {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -1050,11 +1069,12 @@ public class MainActivity extends Activity {
                 }
                 if (status != null) {
                     status.setText(String.format(Locale.US,
-                            "Local edge face recognition  Camera: %s\nFaces: %d  Known people: %d  Samples: %d",
+                            "Local edge face recognition  Camera: %s\nFaces: %d  Known people: %d  Samples: %d\n%s",
                             useFrontCamera ? "front" : "back",
                             faces.size(),
                             faceDatabase.personCount(),
-                            faceDatabase.sampleCount()));
+                            faceDatabase.sampleCount(),
+                            metrics.toStatusString()));
                 }
             }
         });
@@ -1099,6 +1119,10 @@ public class MainActivity extends Activity {
         if (cameraThread != null) {
             cameraThread.quitSafely();
             cameraThread = null;
+        }
+        if (performanceLogger != null) {
+            performanceLogger.close();
+            performanceLogger = null;
         }
         super.onDestroy();
     }
