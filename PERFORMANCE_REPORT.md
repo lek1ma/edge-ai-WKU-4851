@@ -1,118 +1,120 @@
-# 智慧教室边缘人脸识别系统性能报告
+# Smart Classroom Edge Face Recognition System Performance Report
 
-**测试日期：** 2026-06-06  
-**测试版本：** `35b7f3a`  
-**运行方式：** Android 平板本地推理，无云端识别
+**Test date:** June 6, 2026
 
-## 1. 测试目标
+**Test version:** `35b7f3a`
 
-本次测试用于评估当前 Android 版本的人脸检测、FaceNet 特征提取与身份识别性能，重点关注：
+**Execution mode:** Local inference on an Android tablet with no cloud-based recognition
 
-- 单帧人脸检测延迟
-- 人脸识别延迟
-- 端到端处理延迟与吞吐率
-- 会话首帧开销
-- 应用内存占用
-- 扩展到整间教室多人签到时的性能风险
+## 1. Test Objectives
 
-## 2. 测试环境
+This test evaluates the performance of face detection, FaceNet feature extraction, and identity recognition in the current Android application. It focuses on:
 
-| 项目 | 配置 |
+- Per-frame face detection latency
+- Face recognition latency
+- End-to-end processing latency and throughput
+- First-frame overhead for each session
+- Application memory usage
+- Performance risks when scaling to classroom-wide multi-person attendance
+
+## 2. Test Environment
+
+| Item | Configuration |
 |---|---|
-| 平板厂商 | HONOR |
-| 平板型号 | HEY2-W09 |
-| Android 版本 | Android 14 |
-| SoC 平台 | parrot |
-| 屏幕物理分辨率 | 1600 × 2560 |
-| 人脸检测模型 | `face_detection.tflite`，224 KB |
-| 人脸识别模型 | `facenet.tflite`，90 MB |
-| 扫描输入宽度 | 最大 1280 px |
-| 扫描请求间隔 | 250 ms |
-| 最大检测人脸数 | 24 |
-| 推理位置 | 平板本地 |
+| Tablet manufacturer | HONOR |
+| Tablet model | HEY2-W09 |
+| Android version | Android 14 |
+| SoC platform | parrot |
+| Physical display resolution | 1600 x 2560 |
+| Face detection model | `face_detection.tflite`, 224 KB |
+| Face recognition model | `facenet.tflite`, 90 MB |
+| Maximum scan input width | 1280 px |
+| Scan request interval | 250 ms |
+| Maximum number of detected faces | 24 |
+| Inference location | On-device |
 
-## 3. 数据与方法
+## 3. Data and Methodology
 
-性能数据由应用内置的 `PerformanceLogger` 记录，日志位于：
+Performance data was recorded by the application's built-in `PerformanceLogger`. The log is stored at:
 
 ```text
 files/performance/performance_log.csv
 ```
 
-每条记录包含人脸数量、检测耗时、识别耗时和总处理耗时。此次共采集 **13 个运行会话、2970 帧**。统计时以帧编号重新从 1 开始作为新会话边界，并将首次推理单独作为冷启动数据。
+Each record contains the number of detected faces, detection time, recognition time, and total processing time. The test collected **2,970 frames across 13 runtime sessions**. A frame number reset to 1 was treated as the start of a new session, and the first inference of each session was analyzed separately.
 
-由于历史日志跨越多个相机方向和调试版本，最终性能以最新稳定版本的最后一个会话为主；历史数据只用于观察波动范围。
+Because the historical logs include different camera orientations and debugging versions, the final performance assessment primarily uses the last session from the latest stable version. Historical data is used only to evaluate the range of performance variation.
 
-## 4. 最终稳定版本结果
+## 4. Final Stable Version Results
 
-最新会话共记录 **300 帧**，其中 296 帧检测到 1 张人脸、3 帧检测到 2 张人脸、1 帧未检测到人脸。
+The latest session recorded **300 frames**. Of these, 296 frames contained one detected face, 3 frames contained two detected faces, and 1 frame contained no detected face.
 
-### 4.1 单人脸场景
+### 4.1 Single-Face Scenario
 
-| 指标 | 平均值 | P50 | P90 | P95 | 最大值 |
+| Metric | Average | P50 | P90 | P95 | Maximum |
 |---|---:|---:|---:|---:|---:|
-| 人脸检测 | 334.35 ms | 334.16 ms | 340.77 ms | 343.71 ms | 356.41 ms |
-| FaceNet 识别 | 617.34 ms | 616.49 ms | 622.54 ms | 625.10 ms | 670.41 ms |
-| 端到端处理 | 951.69 ms | 951.65 ms | 960.57 ms | 963.19 ms | 1003.74 ms |
+| Face detection | 334.35 ms | 334.16 ms | 340.77 ms | 343.71 ms | 356.41 ms |
+| FaceNet recognition | 617.34 ms | 616.49 ms | 622.54 ms | 625.10 ms | 670.41 ms |
+| End-to-end processing | 951.69 ms | 951.65 ms | 960.57 ms | 963.19 ms | 1003.74 ms |
 
-单人脸场景的端到端平均吞吐率约为 **1.05 帧/秒**，实际连续采样速率约为 **1.00 帧/秒**。
+The average end-to-end pipeline throughput in the single-face scenario was approximately **1.05 frames per second**, while the observed continuous sampling rate was approximately **1.00 frame per second**.
 
-### 4.2 最新会话整体
+### 4.2 Overall Latest Session
 
-| 指标 | 平均值 | P50 | P95 | P99 |
+| Metric | Average | P50 | P95 | P99 |
 |---|---:|---:|---:|---:|
-| 人脸检测 | 336.97 ms | 334.16 ms | 344.63 ms | 351.55 ms |
-| FaceNet 识别 | 615.27 ms | 616.45 ms | 625.09 ms | 631.31 ms |
-| 端到端处理 | 952.24 ms | 951.66 ms | 963.48 ms | 971.80 ms |
+| Face detection | 336.97 ms | 334.16 ms | 344.63 ms | 351.55 ms |
+| FaceNet recognition | 615.27 ms | 616.45 ms | 625.09 ms | 631.31 ms |
+| End-to-end processing | 952.24 ms | 951.66 ms | 963.48 ms | 971.80 ms |
 
-识别阶段约占稳定状态总处理时间的 **64.6%**，是当前主要性能瓶颈；检测阶段约占 **35.4%**。
+The recognition stage accounted for approximately **64.6%** of stable-state processing time and was the primary performance bottleneck. The detection stage accounted for approximately **35.4%**.
 
-虽然扫描请求间隔配置为 250 ms，但应用会等待当前识别任务完成后再处理下一帧，因此实际速度由约 952 ms 的端到端耗时决定，不会达到理论上的 4 帧/秒。
+Although the scan request interval is configured as 250 ms, the application waits for the current recognition task to finish before processing another frame. Therefore, the actual processing rate is determined by the approximately 952 ms end-to-end latency and cannot reach the theoretical rate of 4 frames per second.
 
-## 5. 历史会话与首帧开销
+## 5. Historical Sessions and First-Frame Overhead
 
-排除每个会话第一帧后，全部历史稳态样本的平均端到端耗时为 **1057.69 ms**，P95 为 **1761.04 ms**。历史会话平均实际处理速度约在 **0.61–1.02 帧/秒**之间，主要差异来自相机方向、画面旋转检测路径以及画面中是否存在有效人脸。
+After excluding the first frame of each session, the average end-to-end latency across all historical stable-state samples was **1057.69 ms**, with a P95 latency of **1761.04 ms**. The observed processing rate across historical sessions ranged from approximately **0.61 to 1.02 frames per second**. The variation mainly resulted from camera orientation, rotated-frame detection paths, and whether the image contained a valid face.
 
-13 个会话的首帧平均耗时为 **3597.37 ms**，P95 为 **4135.34 ms**，最大值为 **4203.76 ms**。大多数会话首帧明显受到 TensorFlow Lite 运行时预热和缓存建立影响。
+The average first-frame latency across the 13 sessions was **3597.37 ms**, with a P95 latency of **4135.34 ms** and a maximum of **4203.76 ms**. In most sessions, the first frame was affected by TensorFlow Lite runtime warm-up and cache initialization.
 
-建议在正式签到开始前执行一次不计入签到结果的预热推理，以避免第一名学生出现约 3–4 秒等待。
+A warm-up inference that does not affect attendance results is recommended before starting a class. This prevents the first student from experiencing a delay of approximately 3–4 seconds.
 
-## 6. 内存占用
+## 6. Memory Usage
 
-测试时 Android `dumpsys meminfo` 快照如下：
+The Android `dumpsys meminfo` snapshot collected during testing was:
 
-| 内存项目 | 占用 |
+| Memory category | Usage |
 |---|---:|
-| 应用 Total PSS | 545,140 KB（约 532 MB） |
-| 应用 Total RSS | 695,968 KB（约 680 MB） |
-| Native Heap PSS | 246,736 KB（约 241 MB） |
-| Graphics PSS | 141,652 KB（约 138 MB） |
-| Java Heap PSS | 47,680 KB（约 47 MB） |
+| Application Total PSS | 545,140 KB (approximately 532 MB) |
+| Application Total RSS | 695,968 KB (approximately 680 MB) |
+| Native Heap PSS | 246,736 KB (approximately 241 MB) |
+| Graphics PSS | 141,652 KB (approximately 138 MB) |
+| Java Heap PSS | 47,680 KB (approximately 47 MB) |
 
-当前内存占用偏高，但在测试平板上能够稳定运行。主要开销来自原生推理内存、相机图像 Bitmap 和图形缓冲区。长时间课堂测试仍需关注内存是否持续增长。
+The current memory usage is relatively high, although the application ran stably on the test tablet. The main sources of memory consumption are native inference memory, camera image bitmaps, and graphics buffers. Long-duration classroom testing should verify that memory usage does not continuously increase.
 
-## 7. 教室多人签到能力评估
+## 7. Classroom Multi-Person Attendance Assessment
 
-代码允许单帧最多检测 24 张人脸，但本次数据中仅有 40 帧包含 2–3 张人脸，最新稳定会话中只有 3 帧包含 2 张人脸。因此，现有数据可以证明单人脸性能稳定，**不能直接证明 24 人同时出现时仍能保持相同延迟**。
+The application supports detecting up to 24 faces per frame. However, only 40 frames in this dataset contained two or three faces, and only 3 frames in the latest stable session contained two faces. The available data demonstrates stable single-face performance, but **it does not prove that the system can maintain the same latency when 24 people appear simultaneously**.
 
-当前 FaceNet 模型体积为 90 MB，且单人脸识别约需 617 ms。如果多人特征提取按顺序执行，识别耗时可能随人数明显增长。正式用于整间教室前，应补充 5 人、10 人、20 人三个规模的固定距离测试，并记录：
+The current FaceNet model is 90 MB, and single-face recognition takes approximately 617 ms. If feature extraction is performed sequentially for multiple faces, recognition latency may increase significantly with the number of students. Before full-classroom deployment, fixed-distance tests with 5, 10, and 20 people should measure:
 
-- 每帧检测到的人脸数量和漏检率
-- 首次完成全班身份确认所需时间
-- 每人平均识别延迟
-- 误识别率与 Unknown 比例
-- 连续运行 45–90 分钟后的温度、降频和内存变化
+- Number of detected faces per frame and missed-detection rate
+- Time required to identify the entire class for the first time
+- Average recognition latency per student
+- False recognition rate and proportion of Unknown results
+- Temperature, thermal throttling, and memory behavior after 45–90 minutes of continuous operation
 
-## 8. 优化建议
+## 8. Optimization Recommendations
 
-1. 启动签到前自动执行一次模型预热，降低首次识别延迟。
-2. 优先评估 TensorFlow Lite NNAPI 或 GPU Delegate，重点加速 FaceNet 推理。
-3. 对同一人脸轨迹降低重复提取特征的频率，复用短时间内的识别结果。
-4. 多人场景采用分帧调度，每帧识别部分新出现或低置信度人脸，避免单帧阻塞过久。
-5. 对 5、10、20 人场景建立固定基准，再决定是否需要更轻量的量化 FaceNet 模型。
+1. Run an automatic model warm-up before attendance begins to reduce first-frame latency.
+2. Evaluate TensorFlow Lite NNAPI or GPU Delegate acceleration, focusing on FaceNet inference.
+3. Reduce repeated feature extraction for the same face track and reuse recent recognition results.
+4. Use frame-distributed scheduling in multi-person scenarios, recognizing only new or low-confidence faces in each frame to avoid long blocking operations.
+5. Establish fixed benchmarks for 5-, 10-, and 20-person scenarios before deciding whether a lighter quantized FaceNet model is required.
 
-## 9. 结论
+## 9. Conclusion
 
-当前版本已经实现完全在平板端运行的人脸检测、身份识别和自动签到，符合 Edge AI 的运行方式。在最终稳定的单人脸场景下，端到端平均延迟约 **952 ms**，P95 约 **963 ms**，表现稳定；FaceNet 识别是主要耗时来源。
+The current version performs face detection, identity recognition, and automatic attendance entirely on the tablet, satisfying the on-device processing requirements of Edge AI. In the final stable single-face scenario, the average end-to-end latency was approximately **952 ms**, with a P95 latency of approximately **963 ms**. FaceNet recognition was the primary source of processing time.
 
-该版本适合当前功能演示和小规模签到。要可靠覆盖整间教室，下一阶段的关键不是继续调整单人阈值，而是完成真实多人压力测试，并针对 FaceNet 推理和多人调度进行优化。
+The current version is suitable for functional demonstrations and small-scale attendance. Reliable full-classroom deployment will require realistic multi-person stress testing, followed by optimization of FaceNet inference and multi-face scheduling.

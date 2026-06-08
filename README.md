@@ -82,10 +82,6 @@ python3 tools/quantize_fp16.py /path/to/facenet_saved_model \
   --output facenet_fp16.tflite
 ```
 
-The generated `facenet_fp16.tflite` is ignored by Git and is not enabled at
-runtime. The Android app continues to load the original `facenet.tflite`, so this
-experiment does not affect the current recognition accuracy or tablet installation.
-
 Bundled roster photos under `assets/roster/` are converted into local embeddings on first launch, then live camera faces are compared against that on-device gallery.
 
 Recommended batch roster layout:
